@@ -3,3 +3,4 @@
 "ZIP Package" = "ZIP · 照片包";
 "NSPhotoLibraryAddUsageDescription" = "將照片包中的照片、原況照片和影片逐項保存到系統相簿。";
 "NSPhotoLibraryUsageDescription" = "選擇你想發送的照片和影片，讀取原始資源並在本機打成照片包。僅處理你選擇的內容。";
+"NSLocalNetworkUsageDescription" = "把照片包直接傳給同一個 Wi-Fi 下的附近裝置，並尋找附近的傳送方。";

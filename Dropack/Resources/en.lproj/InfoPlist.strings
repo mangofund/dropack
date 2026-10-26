@@ -3,3 +3,4 @@
 "ZIP Package" = "ZIP · Package";
 "NSPhotoLibraryAddUsageDescription" = "Save photos, Live Photos and videos from your selected files to Photos, one item at a time.";
 "NSPhotoLibraryUsageDescription" = "Read the original photos and videos you select to create a package on your device. Only your selections are processed.";
+"NSLocalNetworkUsageDescription" = "Send packages straight to nearby devices on the same Wi-Fi, and find nearby senders.";

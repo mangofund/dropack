@@ -3,3 +3,4 @@
 "ZIP Package" = "ZIP · Paket";
 "NSPhotoLibraryAddUsageDescription" = "Simpan foto, Live Photos, dan video dari file pilihan Anda ke Foto, satu per satu.";
 "NSPhotoLibraryUsageDescription" = "Baca foto dan video asli pilihan Anda untuk membuat paket di perangkat. Hanya pilihan Anda yang diproses.";
+"NSLocalNetworkUsageDescription" = "Kirim paket langsung ke perangkat terdekat di Wi-Fi yang sama, dan temukan pengirim di sekitar.";

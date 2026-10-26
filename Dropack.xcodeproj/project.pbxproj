@@ -119,6 +119,10 @@
 			isa = PBXBuildFile;
 			fileRef = C51B4B18C1237257432326FC;
 		};
+		3FE7EDD35E8B3FB51534A7B8 = {
+			isa = PBXBuildFile;
+			fileRef = CFAA836D9A8AADFA724F5C8E;
+		};
 		432F8A2208BAD4DE3D4EF5EB = {
 			isa = PBXBuildFile;
 			fileRef = 82962012265926EDEE69C3C5;
@@ -263,6 +267,10 @@
 			isa = PBXBuildFile;
 			productRef = 1FD1E19AE2E70F1222C7C3D7;
 		};
+		99F80C068811383E36FDA879 = {
+			isa = PBXBuildFile;
+			fileRef = F0CF901F893FE3C3DA858B78;
+		};
 		9C9B58E193BDEEBFA89CB33F = {
 			isa = PBXBuildFile;
 			fileRef = 33B2FF9EE7554B758138D5F7;
@@ -379,6 +387,10 @@
 			isa = PBXBuildFile;
 			fileRef = 2E5F0DCDEB88836FEDFCDBE2;
 		};
+		E535ECC0EBBB381855F5A234 = {
+			isa = PBXBuildFile;
+			fileRef = 090AFA8EFE51712AA689C648;
+		};
 		EA184A137591EE9A03F24344 = {
 			isa = PBXBuildFile;
 			fileRef = D746E125D6C66ADC493B9ACF;
@@ -386,6 +398,10 @@
 		EE34FD33F2E80D39F67A6E73 = {
 			isa = PBXBuildFile;
 			fileRef = 70C9DF45CEBDCCEFD9A2FD4C;
+		};
+		EFD42FB01D502635FD8D1048 = {
+			isa = PBXBuildFile;
+			fileRef = 25972D854230513A50B37024;
 		};
 		F00F6E3B1F9522607FE52A24 = {
 			isa = PBXBuildFile;
@@ -464,6 +480,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = "sourcecode.swift";
 			path = "AlbumDetailPolicy.swift";
+			sourceTree = "<group>";
+		};
+		090AFA8EFE51712AA689C648 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "LANTransfer.swift";
 			sourceTree = "<group>";
 		};
 		0D3321277B9F82FC45382F6A = {
@@ -552,6 +574,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = "sourcecode.swift";
 			path = "MediaThumbnailLoader.swift";
+			sourceTree = "<group>";
+		};
+		25972D854230513A50B37024 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "LANShareServer.swift";
 			sourceTree = "<group>";
 		};
 		2B3E296326CF9A0EF008D62E = {
@@ -1015,6 +1043,12 @@
 			path = "ShareAlbum.swift";
 			sourceTree = "<group>";
 		};
+		CFAA836D9A8AADFA724F5C8E = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "LANReceiveController.swift";
+			sourceTree = "<group>";
+		};
 		D08FD452FE6AD1656F171D53 = {
 			isa = PBXFileReference;
 			lastKnownFileType = "sourcecode.swift";
@@ -1082,6 +1116,12 @@
 			includeInIndex = 0;
 			path = "Dropack.app";
 			sourceTree = "BUILT_PRODUCTS_DIR";
+		};
+		F0CF901F893FE3C3DA858B78 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "LANTransferViews.swift";
+			sourceTree = "<group>";
 		};
 		F11C86F1B9CE321B31876288 = {
 			isa = PBXFileReference;
@@ -1185,6 +1225,7 @@
 				C0DB911A4FC37533A890090D,
 				8D7EE48D8FE74FF68285EDBD,
 				80F95930B419A743C001A2A6,
+				090AFA8EFE51712AA689C648,
 				DCFE9D51912C8708227FDD01,
 				BBB0E92A066671294D370568,
 				5B95C7B7A986ACB8BD9FA3B2,
@@ -1213,6 +1254,7 @@
 				0253168FA74BC7E78333DB38,
 				9929112BF3E4853E09F29A98,
 				B7F5567B48F9895C02B9C469,
+				F0CF901F893FE3C3DA858B78,
 				30BF779AFD1FD826309BC587,
 				5067A1913EE266C7EEEF3C8D,
 				359185669DD74675B475288E,
@@ -1254,6 +1296,8 @@
 				51ECE2886349837DD0D61F1E,
 				0EB83AA5793FA3EEC29DB1C6,
 				0FB8DFB80F9D7DD6B38F82A8,
+				CFAA836D9A8AADFA724F5C8E,
+				25972D854230513A50B37024,
 				D908346FF16B644B020E5B6F,
 				63E831A57FCCCEE05B798A66,
 				24BCCD68E05D0C1AA198E2C3,
@@ -1494,6 +1538,7 @@
 				8833E18E68897C4E4F55A14C,
 				7276ABA2C3212A4161719526,
 				BDE9D9E49C9666FD255BBE52,
+				E535ECC0EBBB381855F5A234,
 				7641C7DBFB0C03E4C5027D84,
 				04140E653081C95F45221E40,
 				ABC387E49D1E2867B8CF12E0,
@@ -1515,6 +1560,8 @@
 				0A4B1D831F62A8F696CB4E49,
 				01940735AEE8728F734191AD,
 				1885A6BFF5657F39C6F6150C,
+				3FE7EDD35E8B3FB51534A7B8,
+				EFD42FB01D502635FD8D1048,
 				DD96B51A3DC35DB86ED687B3,
 				B9621CA20FE1D79FDBBBE55D,
 				4D9563164039D46EE27E706D,
@@ -1538,6 +1585,7 @@
 				2A853FBE773E5698908E4329,
 				B0E41E5AC23EFF2CE93F031E,
 				9FFF79D8F11B770183471272,
+				99F80C068811383E36FDA879,
 				7A702A4A97D931E0AF5B4C90,
 				2FD9CAD7426999F0412A5825,
 				BEB7181AFFBEDA3500575069,

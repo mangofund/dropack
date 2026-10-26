@@ -136,6 +136,7 @@ struct ContentView: View {
                                         onDelete: { activeAlert = .deletePackage(id) },
                                         onRename: { beginRename(id) },
                                         onEncryptedShare: { beginEncryptedShare(id) },
+                                        onLANShare: { beginLANShare(id) },
                                         onReselect: {
                                             pendingReselectionID = package.canReselectPhotos ? id : nil
                                             choosePhotos()
@@ -257,6 +258,13 @@ struct ContentView: View {
                                            onDismiss: { activeSheet = nil })
                     case let .issues(kind):
                         IssueListView(controller: controller, kind: kind)
+                    case let .lanShare(request):
+                        LANShareView(request: request)
+                    case .lanReceive:
+                        LANReceiveView { url in
+                            pickerSelection = PendingSource(url: url)
+                            activeSheet = nil
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -519,6 +527,12 @@ struct ContentView: View {
                     actionRow(L10n.tr("收取"), subtitle: L10n.tr("打开分享相册或文件"), symbol: "arrow.down.left", primary: false) {
                         chooseFiles(.mediaFile)
                     }.disabled(working || requestingPhotos).accessibilityIdentifier("importPackageButton")
+                    Button { receiveFromLAN() } label: {
+                        Label(L10n.tr("从局域网接收"), systemImage: "wifi")
+                            .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .background(RelayTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    }.buttonStyle(.plain).foregroundStyle(RelayTheme.ink)
+                    .disabled(working || requestingPhotos).accessibilityIdentifier("lanReceiveButton")
                 }
                 Button { navigate(.packages) } label: {
                     HStack(spacing: 14) {
@@ -861,6 +875,31 @@ struct ContentView: View {
     private func chooseFiles(_ kind: SourceKind) {
         guard !working, !requestingPhotos else { return }
         activeSheet = .source(kind, relink: false)
+    }
+
+    private func receiveFromLAN() {
+        guard !working, !requestingPhotos, activeSheet == nil, sheetDismissalFinished else { return }
+        activeSheet = .lanReceive
+    }
+
+    /// Same preparation as a normal share; the sheet serves the finished package.
+    private func beginLANShare(_ packageID: UUID) {
+        guard !working, !preparingShare, activeSheet == nil, sheetDismissalFinished,
+              let entry = package.library.first(where: { $0.id == packageID }) else { return }
+        let albumID = entry.job.stableAlbumID
+        let title = entry.job.displayTitle
+        preparingShare = true
+        shareResult = nil
+        uiMessage = nil
+        Task {
+            defer { preparingShare = false }
+            if let url = await package.shareURL(packageID: packageID, format: .dropack, onCreated: { updated in
+                showPackageDetail(updated)
+            }), scenePhase == .active, activeSheet == nil, sheetDismissalFinished {
+                showPackageDetail(packageSnapshotID(for: albumID) ?? packageID)
+                activeSheet = .lanShare(LANShareRequest(url: url, title: title))
+            }
+        }
     }
 
     private func shareArchive(_ format: PackageFileFormat, packageID: UUID) {
@@ -1263,7 +1302,7 @@ private struct CryptoProgressCard: View {
 
 private enum DropackAlert { case replaceImport, clearImport, deletePackage(UUID), clearPackage }
 private enum DropackSheet: Identifiable {
-    case sendSources, photos, sendFiles, source(SourceKind, relink: Bool), share(ArchiveShareRequest), help, packageDetails, receivedAlbumDetails, sentAlbumDetails(UUID), issues(IssueKind), mediaPreview(AlbumMediaPreviewRequest)
+    case sendSources, photos, sendFiles, source(SourceKind, relink: Bool), share(ArchiveShareRequest), help, packageDetails, receivedAlbumDetails, sentAlbumDetails(UUID), issues(IssueKind), mediaPreview(AlbumMediaPreviewRequest), lanShare(LANShareRequest), lanReceive
     var archiveShareRequest: ArchiveShareRequest? {
         if case let .share(request) = self { return request }
         return nil
@@ -1273,7 +1312,7 @@ private enum DropackSheet: Identifiable {
     var showsPackageTask: Bool {
         switch self {
         case .help, .packageDetails, .receivedAlbumDetails, .sentAlbumDetails, .issues: return true
-        case .sendSources, .photos, .sendFiles, .source, .share, .mediaPreview: return false
+        case .sendSources, .photos, .sendFiles, .source, .share, .mediaPreview, .lanShare, .lanReceive: return false
         }
     }
     var id: String {
@@ -1289,6 +1328,8 @@ private enum DropackSheet: Identifiable {
         case .help: return "help"
         case .packageDetails: return "package-details"
         case let .issues(kind): return "issues-\(kind.rawValue)"
+        case let .lanShare(request): return "lan-share-\(request.id)"
+        case .lanReceive: return "lan-receive"
         }
     }
 }

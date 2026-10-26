@@ -15,6 +15,7 @@ CODES = ['en', 'zh-Hans', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it', 'pt-BR'
 PERMISSIONS = {
     'NSPhotoLibraryAddUsageDescription': '将照片包中的照片、实况照片和视频逐项保存到系统相册。',
     'NSPhotoLibraryUsageDescription': '选择你想发送的照片和视频，读取原始资源并在本机打成照片包。仅处理你选择的内容。',
+    'NSLocalNetworkUsageDescription': '把照片包直接发给同一个 Wi-Fi 下的附近设备，并寻找附近的发送方。',
 }
 
 def quoted(value):

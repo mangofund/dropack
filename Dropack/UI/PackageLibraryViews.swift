@@ -96,6 +96,7 @@ struct PackageLibraryDetailView: View {
     var onDelete: () -> Void
     var onRename: () -> Void
     var onEncryptedShare: () -> Void
+    var onLANShare: () -> Void
     var onReselect: () -> Void
     var onDetails: () -> Void
     var onUpdated: (UUID) -> Void
@@ -289,6 +290,10 @@ struct PackageLibraryDetailView: View {
                             .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
                                 hasIssue: entry.issue != nil, isBusy: disabled))
                             .accessibilityIdentifier("encryptedShareButton")
+                        Button(L10n.tr("局域网直传…"), systemImage: "wifi") { onLANShare() }
+                            .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
+                                hasIssue: entry.issue != nil, isBusy: disabled))
+                            .accessibilityIdentifier("lanShareButton")
                         Button(L10n.tr("导出普通 ZIP"), systemImage: "doc.zipper") { onShare(.zip) }
                             .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
                                 hasIssue: entry.issue != nil, isBusy: disabled))
