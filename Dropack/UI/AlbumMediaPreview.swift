@@ -1,5 +1,6 @@
 import QuickLook
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A full-resolution native viewer, deliberately separate from the thumbnails
 /// and from both the packaging and Photos-import state machines.
@@ -88,7 +89,7 @@ private final class AlbumMediaPreviewModel: ObservableObject {
                 }
             }
             guard !Task.isCancelled, generation == token else { result.close(); return }
-            guard QLPreviewController.canPreview(result.url as NSURL) else {
+            guard AlbumMediaPreview.canPreview(result.url) else {
                 result.close(); throw AlbumMediaPreviewError.unsupported
             }
             lease = result; progress = nil
@@ -157,5 +158,17 @@ private struct NativeAlbumMediaPreview: UIViewControllerRepresentable {
         let previewItemURL: URL?
         let previewItemTitle: String?
         init(url: URL, title: String) { previewItemURL = url; previewItemTitle = title }
+    }
+}
+
+extension AlbumMediaPreview {
+    static func canPreview(_ url: URL) -> Bool {
+        #if targetEnvironment(macCatalyst)
+        // QLPreviewController.canPreview is not available on Mac Catalyst.
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return type.conforms(to: .image) || type.conforms(to: .audiovisualContent)
+        #else
+        return QLPreviewController.canPreview(url as NSURL)
+        #endif
     }
 }

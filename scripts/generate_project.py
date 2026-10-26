@@ -188,7 +188,10 @@ def generate() -> dict[Path, str]:
             "PRODUCT_BUNDLE_IDENTIFIER": "com.mangofund.dropack",
             "PRODUCT_NAME": "$(TARGET_NAME)",
             "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator",
-            "SUPPORTS_MACCATALYST": "NO",
+            # The Mac app is the iPad app built with Mac Catalyst (same bundle ID).
+            "SUPPORTS_MACCATALYST": "YES",
+            "DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER": "NO",
+            "MACOSX_DEPLOYMENT_TARGET": "14.0",
             "SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD": "NO",
             "TARGETED_DEVICE_FAMILY": "1,2",
         }
@@ -274,10 +277,11 @@ def generate() -> dict[Path, str]:
                         buildRules=[], dependencies=[])
     widget_proxy = add("widget-proxy", "PBXContainerItemProxy", containerPortal=identifier("project"),
                        proxyType=1, remoteGlobalIDString=widget_target, remoteInfo="DropackLiveActivity")
-    widget_dependency = add("widget-dependency", "PBXTargetDependency",
+    # Live Activities are iPhone/iPad only; the Mac Catalyst app does not embed the extension.
+    widget_dependency = add("widget-dependency", "PBXTargetDependency", platformFilter="ios",
                             target=widget_target, targetProxy=widget_proxy)
     objects[target]["dependencies"].append(widget_dependency)
-    embedded_widget = add("widget-embed", "PBXBuildFile", fileRef=widget_product,
+    embedded_widget = add("widget-embed", "PBXBuildFile", fileRef=widget_product, platformFilter="ios",
                           settings={"ATTRIBUTES": ["RemoveHeadersOnCopy"]})
     embed_phase = add("widget-embed-phase", "PBXCopyFilesBuildPhase", buildActionMask=2147483647,
                       dstPath="", dstSubfolderSpec=13, files=[embedded_widget],
