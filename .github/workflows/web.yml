@@ -20,11 +20,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build fixtures and test
+      - name: Build fixtures
         run: |
+          set -o pipefail
           python -m pip install --quiet cryptography
-          python web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures"
-          DROPACK_FIXTURES="$RUNNER_TEMP/fixtures" node --test web/tests/
+          python web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures" 2>&1 | tee "$RUNNER_TEMP/fixtures.log" || {
+            tail -20 "$RUNNER_TEMP/fixtures.log" | sed 's/^/::error::/'; exit 1; }
+      - name: Test
+        run: |
+          set -o pipefail
+          DROPACK_FIXTURES="$RUNNER_TEMP/fixtures" node --test web/tests/ 2>&1 | tee "$RUNNER_TEMP/test.log" || {
+            grep -E 'not ok|Error|expected|actual|at ' "$RUNNER_TEMP/test.log" | head -30 | sed 's/^/::error::/'; exit 1; }
 
   deploy:
     # Publishes web/receive to GitHub Pages. Enable it once under
