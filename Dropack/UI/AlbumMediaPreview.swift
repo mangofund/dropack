@@ -89,7 +89,7 @@ private final class AlbumMediaPreviewModel: ObservableObject {
                 }
             }
             guard !Task.isCancelled, generation == token else { result.close(); return }
-            guard Self.canPreview(result.url) else {
+            guard AlbumMediaPreview.canPreview(result.url) else {
                 result.close(); throw AlbumMediaPreviewError.unsupported
             }
             lease = result; progress = nil
