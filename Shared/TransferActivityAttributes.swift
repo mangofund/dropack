@@ -1,10 +1,12 @@
-import ActivityKit
 import Foundation
+#if !targetEnvironment(macCatalyst)
+import ActivityKit
+#endif
 
 /// Compile this file into both the app and its WidgetKit extension. The payload
 /// contains task counts, resource progress and language only; no filenames, URLs,
 /// bookmarks or photos.
-public struct TransferActivityAttributes: ActivityAttributes, Sendable {
+public struct TransferActivityAttributes: Codable, Sendable {
     public enum Kind: String, Codable, Hashable, Sendable {
         case packaging
         case importing
@@ -106,3 +108,8 @@ public enum TransferByteCountText {
         return formatter.string(fromByteCount: Int64(clamping: bytes))
     }
 }
+
+// Live Activities do not exist on Mac Catalyst; the payload stays usable there.
+#if !targetEnvironment(macCatalyst)
+extension TransferActivityAttributes: ActivityAttributes {}
+#endif
