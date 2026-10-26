@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dropack Receiver</title>
+<meta name="description" content="Open .dropack photo packages in any browser. Files never leave your device.">
+<style>
+  :root {
+    --bg: #f6f4ef; --surface: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e3dfd6;
+    --accent: #c4581f; --accent-ink: #ffffff; --warn: #9a3412; --pale: #f3e7dc;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151413; --surface: #201e1c; --ink: #f2efe9; --muted: #a39e94; --line: #34312d;
+            --accent: #f08a4b; --accent-ink: #1b0f06; --warn: #fdba74; --pale: #2b211b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  header svg { width: 36px; height: 36px; flex: none; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 20px; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .drop { display: grid; place-items: center; text-align: center; gap: 12px; min-height: 220px;
+          border: 2px dashed var(--line); cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop.over { border-color: var(--accent); background: var(--pale); }
+  button, .button { appearance: none; border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 600;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=password] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+                         background: var(--bg); color: var(--ink); font: inherit; }
+  form { display: grid; gap: 12px; max-width: 420px; }
+  .error { color: var(--warn); font-size: 14px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .item { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .thumb { aspect-ratio: 1; background: var(--pale); display: grid; place-items: center; position: relative; color: var(--muted); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .badge { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px;
+           border-radius: 6px; padding: 1px 6px; }
+  .meta { padding: 8px 10px 10px; display: grid; gap: 6px; font-size: 13px; }
+  .meta button { padding: 6px 10px; font-size: 13px; }
+  progress { width: 100%; accent-color: var(--accent); }
+  .status { position: sticky; bottom: 12px; margin-top: 16px; }
+  .note { margin-top: 24px; font-size: 13px; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="9" fill="#c4581f"/><path d="M11 10h8a8 8 0 0 1 0 16h-8z" fill="none" stroke="#fff" stroke-width="3"/><path d="M15 18h11m-4-4 4 4-4 4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div><h1 data-t="title"></h1><div class="muted" data-t="subtitle"></div></div>
+  </header>
+
+  <section id="pick" class="card drop" tabindex="0" role="button">
+    <div>
+      <p style="margin:0 0 8px;font-weight:600" data-t="drop"></p>
+      <p class="muted" style="margin:0" data-t="dropHint"></p>
+    </div>
+    <span class="button" data-t="choose"></span>
+    <input id="file" type="file" accept=".dropack,.zip,application/zip" hidden>
+  </section>
+
+  <section id="locked" class="card" hidden>
+    <form id="unlock">
+      <h2 data-t="locked"></h2>
+      <div class="muted" data-t="lockedHint"></div>
+      <input id="password" type="password" autocomplete="off" autofocus>
+      <div id="unlockError" class="error" hidden></div>
+      <div style="display:flex;gap:12px"><button id="unlockButton" type="submit" data-t="open"></button>
+        <button type="button" class="secondary" data-action="reset" data-t="another"></button></div>
+    </form>
+  </section>
+
+  <section id="album" hidden>
+    <div class="card">
+      <h2 id="albumTitle"></h2>
+      <div id="albumMeta" class="muted"></div>
+    </div>
+    <div class="toolbar">
+      <div class="muted" id="albumCount"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="secondary" data-action="reset" data-t="another"></button>
+        <button type="button" id="downloadAll" data-t="downloadAll"></button>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <div id="error" class="card error" hidden style="margin-top:16px"></div>
+  <div id="status" class="card status" hidden><div id="statusText" style="margin-bottom:8px"></div><progress id="statusBar" max="1" value="0"></progress></div>
+  <p class="note" data-t="privacy"></p>
+</main>
+
+<script type="module">
+import { DropackError, EncryptedSource, PlainSource, isEncrypted, openAlbum } from './dropack.js';
+
+const zh = /^zh/i.test(navigator.language || '');
+const strings = {
+  title: ['Dropack 网页接收', 'Dropack Receiver'],
+  subtitle: ['在任何设备的浏览器里打开 .dropack 照片包', 'Open .dropack photo packages in any browser'],
+  drop: ['把 .dropack 或 ZIP 文件拖到这里', 'Drop a .dropack or ZIP file here'],
+  dropHint: ['也支持加密照片包。几十 GB 的大包也能打开。', 'Password-protected packages and very large packages work too.'],
+  choose: ['选择文件', 'Choose File'],
+  locked: ['这个照片包已加密', 'This package is password protected'],
+  lockedHint: ['请输入发送者告诉你的密码。', 'Enter the password the sender gave you.'],
+  open: ['打开', 'Open'],
+  another: ['打开其他文件', 'Open Another File'],
+  downloadAll: ['全部保存', 'Save All'],
+  download: ['保存', 'Save'],
+  live: ['实况', 'LIVE'],
+  video: ['视频', 'Video'],
+  photo: ['照片', 'Photo'],
+  items: ['%d 项 · %s', '%d items · %s'],
+  from: ['来自 %s', 'From %s'],
+  checking: ['正在核对密码…', 'Checking password…'],
+  reading: ['正在读取…', 'Reading…'],
+  saving: ['正在保存 %s', 'Saving %s'],
+  savedAll: ['已保存 %d 个文件', 'Saved %d files'],
+  pickFolder: ['请选择保存的文件夹', 'Choose a folder to save into'],
+  multiHint: ['浏览器可能会询问是否允许下载多个文件，请选择允许。', 'Your browser may ask to allow multiple downloads. Please allow it.'],
+  privacy: ['文件只在你的浏览器里读取和解密，不会上传到任何服务器。', 'Files are read and decrypted only in your browser. Nothing is uploaded.'],
+  wrongPassword: ['密码不正确，请向发送者确认后重试。', 'Incorrect password. Check it with the sender and try again.'],
+  emptyPassword: ['请输入密码。', 'Enter the password.'],
+  damaged: ['文件不完整或已损坏，请让发送者重新发送。', 'The file is incomplete or damaged. Ask the sender to send it again.'],
+  unsupportedVersion: ['这个照片包需要更新版本的接收页面。', 'This package needs a newer version of this page.'],
+  notZip: ['这不是 .dropack 或 ZIP 文件。', 'This is not a .dropack or ZIP file.'],
+  multipart: ['不支持分卷 ZIP。', 'Split ZIP archives are not supported.'],
+  zipEncrypted: ['不支持用 ZIP 密码加密的文件。', 'ZIP files encrypted with a ZIP password are not supported.'],
+  unsupportedCompression: ['这个浏览器无法解压其中的文件，请换用新版 Chrome、Edge、Safari 或 Firefox。', 'This browser cannot decompress these files. Use a recent Chrome, Edge, Safari or Firefox.'],
+  invalidManifest: ['照片包清单不完整或不受支持。', 'The package manifest is incomplete or unsupported.'],
+  noMedia: ['这个 ZIP 里没有照片或视频。', 'This ZIP contains no photos or videos.'],
+  generic: ['无法打开这个文件：%s', 'Could not open this file: %s'],
+};
+const t = (key, ...args) => {
+  let value = strings[key][zh ? 0 : 1];
+  for (const arg of args) value = value.replace(/%[ds]/, arg);
+  return value;
+};
+document.documentElement.lang = zh ? 'zh-Hans' : 'en';
+document.title = t('title');
+document.querySelectorAll('[data-t]').forEach((node) => { node.textContent = t(node.dataset.t); });
+
+const $ = (id) => document.getElementById(id);
+const sizeFormat = (bytes) => {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes, unit = 0;
+  while (value >= 1000 && unit < units.length - 1) { value /= 1000; unit++; }
+  return `${value.toFixed(value < 10 && unit ? 1 : 0)} ${units[unit]}`;
+};
+const dateFormat = new Intl.DateTimeFormat(zh ? 'zh-CN' : undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+let file = null, album = null, objectURLs = [];
+
+function show(section) {
+  for (const id of ['pick', 'locked', 'album']) $(id).hidden = id !== section;
+}
+function showError(error) {
+  const box = $('error');
+  if (!error) { box.hidden = true; return; }
+  console.error(error);
+  box.textContent = error instanceof DropackError && strings[error.code] ? t(error.code) : t('generic', error.message || String(error));
+  box.hidden = false;
+}
+function status(text, fraction) {
+  $('status').hidden = text === null;
+  if (text !== null) { $('statusText').textContent = text; $('statusBar').value = fraction ?? 0; }
+}
+function reset() {
+  objectURLs.forEach(URL.revokeObjectURL); objectURLs = [];
+  file = null; album = null; $('file').value = ''; $('password').value = '';
+  $('grid').replaceChildren(); showError(null); status(null); show('pick');
+}
+
+async function openFile(selected) {
+  reset();
+  file = selected;
+  try {
+    if (await isEncrypted(file)) { show('locked'); $('password').focus(); return; }
+    status(t('reading'), 0);
+    await present(await openAlbum(new PlainSource(file)));
+  } catch (error) { show('pick'); showError(error); }
+  finally { status(null); }
+}
+
+$('unlock').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('unlockButton');
+  button.disabled = true; $('unlockError').hidden = true;
+  status(t('checking'), 0);
+  try {
+    const source = await EncryptedSource.open(file, $('password').value);
+    status(t('reading'), 0.5);
+    await present(await openAlbum(source));
+  } catch (error) {
+    if (error.code === 'wrongPassword' || error.code === 'emptyPassword') {
+      $('unlockError').textContent = t(error.code); $('unlockError').hidden = false; $('password').select();
+    } else { showError(error); }
+  } finally { button.disabled = false; status(null); }
+});
+
+function filename(item, resource, index) {
+  const ext = resource.filename.split('.').pop().toLowerCase();
+  const date = item.creationDate;
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = date ? `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}` : String(index + 1).padStart(4, '0');
+  const suffix = item.isLivePhoto && resource.kind === 'video' ? '_live' : '';
+  return `Dropack_${stamp}_${item.id.slice(0, 4)}${suffix}.${ext}`;
+}
+
+async function present(opened) {
+  album = opened;
+  $('albumTitle').textContent = album.title || file.name.replace(/\.(dropack|zip)$/i, '');
+  const meta = [album.senderName ? t('from', album.senderName) : null, album.createdAt ? dateFormat.format(album.createdAt) : null].filter(Boolean);
+  $('albumMeta').textContent = meta.join(' · ');
+  const total = album.items.reduce((sum, item) => sum + item.byteCount, 0);
+  $('albumCount').textContent = t('items', album.items.length, sizeFormat(total));
+  const grid = $('grid');
+  album.items.forEach((item, index) => {
+    const card = document.createElement('div'); card.className = 'item';
+    const thumb = document.createElement('div'); thumb.className = 'thumb';
+    thumb.textContent = item.kind === 'video' ? '▶' : '◻';
+    if (item.isLivePhoto || item.kind === 'video') {
+      const badge = document.createElement('span'); badge.className = 'badge';
+      badge.textContent = item.isLivePhoto ? t('live') : t('video'); thumb.append(badge);
+    }
+    const meta = document.createElement('div'); meta.className = 'meta';
+    const info = document.createElement('div'); info.className = 'muted';
+    info.textContent = [item.creationDate ? dateFormat.format(item.creationDate) : null, sizeFormat(item.byteCount)].filter(Boolean).join(' · ');
+    const save = document.createElement('button'); save.type = 'button'; save.textContent = t('download');
+    save.addEventListener('click', () => saveItems([[item, index]]));
+    meta.append(info, save); card.append(thumb, meta); grid.append(card);
+    loadThumbnail(item, thumb);
+  });
+  show('album');
+}
+
+async function loadThumbnail(item, thumb) {
+  try {
+    let blob = null;
+    if (item.preview) blob = await album.zip.blob(item.preview);
+    else if (item.kind === 'photo' && item.resources[0].entry.size <= 8 * 1024 * 1024 && /\.(jpe?g|png|gif|webp|avif)$/i.test(item.resources[0].filename)) {
+      blob = await album.zip.blob(item.resources[0].entry);
+    }
+    if (!blob) return;
+    const url = URL.createObjectURL(new Blob([blob], { type: 'image/jpeg' })); objectURLs.push(url);
+    const image = new Image(); image.alt = ''; image.loading = 'lazy'; image.src = url;
+    image.onload = () => { thumb.prepend(image); [...thumb.childNodes].forEach((node) => { if (node.nodeType === 3) node.remove(); }); };
+  } catch { /* the placeholder stays */ }
+}
+
+async function writeBlob(blob, name, directory) {
+  if (directory) {
+    const handle = await directory.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable();
+    await blob.stream().pipeTo(writable);
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a'); link.href = url; link.download = name;
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  await new Promise((resolve) => setTimeout(resolve, 400)); // browsers drop rapid consecutive downloads
+}
+
+async function saveItems(pairs) {
+  showError(null);
+  const resources = pairs.flatMap(([item, index]) => item.resources.map((resource) => [item, resource, index]));
+  let directory = null;
+  if (resources.length > 2 && 'showDirectoryPicker' in window) {
+    status(t('pickFolder'), 0);
+    try { directory = await window.showDirectoryPicker({ mode: 'readwrite' }); }
+    catch (error) { status(null); if (error.name === 'AbortError') return; }
+  } else if (resources.length > 2) { status(t('multiHint'), 0); }
+  const buttons = document.querySelectorAll('button'); buttons.forEach((button) => { button.disabled = true; });
+  try {
+    for (const [position, [item, resource, index]] of resources.entries()) {
+      const name = filename(item, resource, index);
+      status(t('saving', name), position / resources.length);
+      const blob = await album.zip.blob(resource.entry, (fraction) => status(t('saving', name), (position + fraction) / resources.length));
+      await writeBlob(blob, name, directory);
+    }
+    if (resources.length > 1) { status(t('savedAll', resources.length), 1); setTimeout(() => status(null), 3000); }
+    else status(null);
+  } catch (error) { status(null); showError(error); }
+  finally { buttons.forEach((button) => { button.disabled = false; }); }
+}
+
+$('downloadAll').addEventListener('click', () => saveItems(album.items.map((item, index) => [item, index])));
+document.querySelectorAll('[data-action=reset]').forEach((button) => button.addEventListener('click', reset));
+const pick = $('pick');
+pick.addEventListener('click', () => $('file').click());
+pick.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('file').click(); } });
+$('file').addEventListener('change', () => { if ($('file').files[0]) openFile($('file').files[0]); });
+for (const type of ['dragenter', 'dragover']) pick.addEventListener(type, (event) => { event.preventDefault(); pick.classList.add('over'); });
+for (const type of ['dragleave', 'drop']) pick.addEventListener(type, () => pick.classList.remove('over'));
+pick.addEventListener('drop', (event) => { event.preventDefault(); const dropped = event.dataTransfer.files[0]; if (dropped) openFile(dropped); });
+</script>
+</body>
+</html>

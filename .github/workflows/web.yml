@@ -1,0 +1,53 @@
+name: Web receiver
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The system Python on Ubuntu runners refuses pip installs (PEP 668).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build fixtures
+        run: |
+          set -o pipefail
+          python -m pip install --quiet cryptography
+          python web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures" 2>&1 | tee "$RUNNER_TEMP/fixtures.log" || {
+            tail -20 "$RUNNER_TEMP/fixtures.log" | sed 's/^/::error::/'; exit 1; }
+      - name: Test
+        run: |
+          set -o pipefail
+          DROPACK_FIXTURES="$RUNNER_TEMP/fixtures" node --test web/tests/dropack.test.mjs 2>&1 | tee "$RUNNER_TEMP/test.log" || {
+            grep -E 'not ok|Error|expected|actual|at ' "$RUNNER_TEMP/test.log" | head -30 | sed 's/^/::error::/'; exit 1; }
+
+  deploy:
+    # Publishes web/receive to GitHub Pages. Enable it once under
+    # Settings → Pages → Source: GitHub Actions.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/receive
+      - id: deployment
+        uses: actions/deploy-pages@v4
