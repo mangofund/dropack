@@ -65,19 +65,23 @@ final class PackageBackgroundExecution: PackageBackgroundManaging {
         beginShortTask(token: token)
         // A resumed checkpoint also requires an explicit foreground user action.
         // Never submit a continued task merely because the scene backgrounded.
+        #if !targetEnvironment(macCatalyst)
         if #available(iOS 26.0, *), userInitiated,
            UIApplication.shared.applicationState == .active {
             requestContinuedProcessing(token: token)
         }
+        #endif
         if isInBackground { monitorDeadline(token: token) }
     }
 
     func update(_ snapshot: PackageActivitySnapshot) {
         guard token != nil, !expirationDelivered else { return }
         latest = snapshot
+        #if !targetEnvironment(macCatalyst)
         if #available(iOS 26.0, *), let task = systemTask as? BGContinuedProcessingTask {
             updateSystemProgress(task)
         }
+        #endif
     }
 
     func finish(success: Bool) {
@@ -92,11 +96,13 @@ final class PackageBackgroundExecution: PackageBackgroundManaging {
         pendingRequestIdentifier = nil
         let completedTask = systemTask
         systemTask = nil
+        #if !targetEnvironment(macCatalyst)
         if #available(iOS 26.0, *), success,
            let continued = completedTask as? BGContinuedProcessingTask {
             if continued.progress.totalUnitCount <= 0 { continued.progress.totalUnitCount = 1_000 }
             continued.progress.completedUnitCount = continued.progress.totalUnitCount
         }
+        #endif
         completedTask?.setTaskCompleted(success: success)
         endShortTask()
         setReportsSystemProgress(false)
@@ -197,6 +203,9 @@ final class PackageBackgroundExecution: PackageBackgroundManaging {
         onSystemProgress?(enabled)
     }
 
+    // Mac Catalyst has no continued-processing tasks; the UIKit short task
+    // remains the only assertion there.
+    #if !targetEnvironment(macCatalyst)
     @available(iOS 26.0, *)
     private func requestContinuedProcessing(token: UUID) {
         guard self.token == token, !expirationDelivered else { return }
@@ -272,4 +281,5 @@ final class PackageBackgroundExecution: PackageBackgroundManaging {
             task.updateTitle("Dropack", subtitle: stage + count)
         }
     }
+    #endif
 }

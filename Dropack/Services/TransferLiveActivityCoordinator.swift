@@ -3,6 +3,8 @@ import Combine
 import Foundation
 import UIKit
 
+#if !targetEnvironment(macCatalyst)
+
 /// Local presentation only: a Live Activity never grants background execution.
 /// Requests and updates are serialized on MainActor; updates never overlap an
 /// end operation. Call receive only with the current durable controller state.
@@ -343,3 +345,29 @@ final class TransferLiveActivityCoordinator: ObservableObject {
         }
     }
 }
+
+#else
+
+/// Mac Catalyst has no Live Activities. Nothing is ever presented natively, so
+/// the app's in-window progress banner is used for every job.
+@MainActor
+final class TransferLiveActivityCoordinator: ObservableObject {
+    typealias Attributes = TransferActivityAttributes
+    typealias State = Attributes.ContentState
+    typealias Kind = Attributes.Kind
+
+    @Published private(set) var presentedJobIDs: Set<UUID> = []
+    @Published private(set) var hasPresentedJobIDs: Set<UUID> = []
+    @Published private(set) var fallbackReason: String?
+
+    init() {}
+
+    func isPresented(jobID: UUID) -> Bool { false }
+    func receive(jobID: UUID, kind: Kind, state: State, isWorking: Bool) {}
+    func clear(jobID: UUID) {}
+    func clearAll() {}
+    func reconcile(validJobIDs: Set<UUID>) {}
+    func sceneDidBecomeActive() {}
+}
+
+#endif
