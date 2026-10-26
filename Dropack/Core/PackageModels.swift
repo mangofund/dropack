@@ -252,6 +252,8 @@ public struct PackageJob: Codable, Identifiable, Sendable {
     /// nil is a legacy active task. false means metadata/capture only until Share.
     public var packagingRequested: Bool?
     public var reuseStrategy: String?
+    /// Sender privacy choice for this album revision. nil is legacy (keep metadata).
+    public var removesLocation: Bool?
 
     public init(assetIdentifiers: [String], senderName: String? = nil) {
         id = UUID(); createdAt = Date()
