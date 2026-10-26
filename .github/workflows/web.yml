@@ -16,10 +16,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # The system Python on Ubuntu runners refuses pip installs (PEP 668).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Build fixtures and test
         run: |
-          python3 -m pip install --quiet cryptography
-          python3 web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures"
+          python -m pip install --quiet cryptography
+          python web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures"
           DROPACK_FIXTURES="$RUNNER_TEMP/fixtures" node --test web/tests/
 
   deploy:
