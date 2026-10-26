@@ -97,7 +97,8 @@ final class PackageCryptoController: ObservableObject {
     private static func checkSpace(required: UInt64, at directory: URL) throws {
         let values = try directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         let available = UInt64(max(0, values.volumeAvailableCapacityForImportantUsage ?? 0))
-        let needed = required.addingClamped(safetyMargin)
+        let (sum, overflow) = required.addingReportingOverflow(safetyMargin)
+        let needed = overflow ? UInt64.max : sum
         guard available >= needed else { throw PhotoPackageError.insufficientSpace(needed, available) }
     }
 
