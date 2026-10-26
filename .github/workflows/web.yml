@@ -1,0 +1,43 @@
+name: Web receiver
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build fixtures and test
+        run: |
+          python3 -m pip install --quiet cryptography
+          python3 web/tests/make_fixtures.py "$RUNNER_TEMP/fixtures"
+          DROPACK_FIXTURES="$RUNNER_TEMP/fixtures" node --test web/tests/
+
+  deploy:
+    # Publishes web/receive to GitHub Pages. Enable it once under
+    # Settings → Pages → Source: GitHub Actions.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/receive
+      - id: deployment
+        uses: actions/deploy-pages@v4
