@@ -12,7 +12,7 @@ WebCrypto; nothing is uploaded, so the page can be hosted anywhere static.
 
 ```sh
 python3 web/tests/make_fixtures.py /tmp/dropack-fixtures
-DROPACK_FIXTURES=/tmp/dropack-fixtures node --test web/tests/
+DROPACK_FIXTURES=/tmp/dropack-fixtures node --test web/tests/dropack.test.mjs
 python3 -m http.server -d web/receive 8000   # then open http://localhost:8000
 ```
 
