@@ -32,7 +32,7 @@ struct ArchiveSharePresenter: UIViewControllerRepresentable {
 
 @MainActor
 final class ArchiveSharePresentationController: UIViewController, UIAdaptivePresentationControllerDelegate {
-    private let logger = Logger(subsystem: "app.dropack.ios", category: "ArchiveSharing")
+    private let logger = Logger(subsystem: "com.mangofund.dropack", category: "ArchiveSharing")
     private var requested: ArchiveShareRequest?
     private var activeRequest: ArchiveShareRequest?
     private var activityController: UIActivityViewController?

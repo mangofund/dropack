@@ -71,7 +71,7 @@ enum MediaSourceError: LocalizedError, Sendable {
 /// All synchronous file-provider and ZIP work runs on this actor's executor, never MainActor.
 /// Only one media file is staged at a time; neither the ZIP nor a large image is loaded into RAM.
 actor MediaSourceService {
-    private let logger = Logger(subsystem: "app.dropack.ios", category: "SourcePreparation")
+    private let logger = Logger(subsystem: "com.mangofund.dropack", category: "SourcePreparation")
     private let chunkSize = 256 * 1024
     private var scannedZipFingerprints: [String: SourceFingerprint] = [:]
     private var indexedZipURL: URL?

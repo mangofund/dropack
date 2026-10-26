@@ -120,7 +120,7 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>app.dropack.ios.package.*</string>
+		<string>com.mangofund.dropack.package.*</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

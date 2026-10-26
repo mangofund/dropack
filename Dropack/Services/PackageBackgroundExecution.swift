@@ -28,7 +28,7 @@ protocol PackageBackgroundManaging: AnyObject {
 @MainActor
 final class PackageBackgroundExecution: PackageBackgroundManaging {
     static let shared = PackageBackgroundExecution()
-    static let permittedIdentifier = "app.dropack.ios.package.*"
+    static let permittedIdentifier = "com.mangofund.dropack.package.*"
 
     private var token: UUID?
     private var onExpiration: (@MainActor (PackageBackgroundExpirationReason) -> Void)?
@@ -200,7 +200,7 @@ final class PackageBackgroundExecution: PackageBackgroundManaging {
     @available(iOS 26.0, *)
     private func requestContinuedProcessing(token: UUID) {
         guard self.token == token, !expirationDelivered else { return }
-        let identifier = "app.dropack.ios.package.\(token.uuidString)"
+        let identifier = "com.mangofund.dropack.package.\(token.uuidString)"
         // Continued handlers may be registered after launch. Register concrete
         // identifiers, never the Info.plist wildcard, and never register twice.
         if !registeredIdentifiers.contains(identifier) {
