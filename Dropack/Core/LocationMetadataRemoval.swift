@@ -44,9 +44,16 @@ public enum LocationMetadataRemoval {
               let output = CGImageDestinationCreateWithURL(destination as CFURL, type, CGImageSourceGetCount(input), nil) else {
             throw LocationMetadataError.unsupported(displayName)
         }
-        let options = [kCGImageMetadataShouldExcludeGPS: true] as [CFString: Any] as CFDictionary
+        // Without explicit metadata the copy drops EXIF/XMP entirely. Merge the
+        // primary image's metadata back and let ImageIO exclude only GPS. The
+        // result is verified below for every image in the container.
+        var options: [CFString: Any] = [kCGImageMetadataShouldExcludeGPS: true]
+        if let metadata = CGImageSourceCopyMetadataAtIndex(input, 0, nil) {
+            options[kCGImageDestinationMetadata] = metadata
+            options[kCGImageDestinationMergeMetadata] = true
+        }
         // Copies the encoded image data losslessly; the call finalizes the destination.
-        guard CGImageDestinationCopyImageSource(output, input, options, nil),
+        guard CGImageDestinationCopyImageSource(output, input, options as CFDictionary, nil),
               !photoHasLocation(destination) else {
             throw LocationMetadataError.unsupported(displayName)
         }
