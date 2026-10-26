@@ -30,6 +30,13 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var path: [WorkflowRoute] = []
+    @StateObject private var crypto = PackageCryptoController()
+    @State private var encryptingPackageID: UUID?
+    @State private var sharePassword = ""
+    @State private var sharePasswordConfirmation = ""
+    @State private var pendingDecryption: PendingDecryption?
+    @State private var decryptionPassword = ""
+    @State private var decryptionMessage: String?
     @State private var activeSheet: DropackSheet?
     @State private var pendingSendSource: SendSourceChoice?
     @State private var librarySection: AlbumLibrarySection = .sent
@@ -61,7 +68,7 @@ struct ContentView: View {
     @State private var taskCoverJobID: UUID?
     @State private var taskCoverAssetID: String?
 
-    private var working: Bool { controller.isBusy || controller.isPreparing || package.isBusy || creatingPackage }
+    private var working: Bool { controller.isBusy || controller.isPreparing || package.isBusy || creatingPackage || crypto.isRunning }
 
     private var navigationContent: some View {
         VStack(spacing: 0) {
@@ -128,6 +135,7 @@ struct ContentView: View {
                                         onResume: { Task { await package.resume(packageID: id) } },
                                         onDelete: { activeAlert = .deletePackage(id) },
                                         onRename: { beginRename(id) },
+                                        onEncryptedShare: { beginEncryptedShare(id) },
                                         onReselect: {
                                             pendingReselectionID = package.canReselectPhotos ? id : nil
                                             choosePhotos()
@@ -177,6 +185,32 @@ struct ContentView: View {
                 }) }
             }
             Button(L10n.tr("取消"), role: .cancel) { renamingPackageID = nil }
+        }
+        .alert(L10n.tr("设置分享密码"), isPresented: Binding(get: { encryptingPackageID != nil }, set: { if !$0 { encryptingPackageID = nil } })) {
+            SecureField(L10n.tr("密码"), text: $sharePassword)
+            SecureField(L10n.tr("再次输入密码"), text: $sharePasswordConfirmation)
+            Button(L10n.tr("加密并分享")) {
+                guard let id = encryptingPackageID else { return }
+                encryptingPackageID = nil
+                let password = sharePassword
+                sharePassword = ""
+                defer { sharePasswordConfirmation = "" }
+                if let problem = PackageCryptoController.validationMessage(password: password, confirmation: sharePasswordConfirmation) {
+                    uiMessage = problem
+                } else { shareEncryptedArchive(packageID: id, password: password) }
+            }
+            Button(L10n.tr("取消"), role: .cancel) { encryptingPackageID = nil; sharePassword = ""; sharePasswordConfirmation = "" }
+        } message: { Text(L10n.tr("对方需要输入这个密码才能打开照片包。请通过其他方式告诉对方。")) }
+        .alert(L10n.tr("输入密码"), isPresented: Binding(get: { pendingDecryption?.isAsking == true },
+                                                     set: { if !$0 { pendingDecryption?.isAsking = false } })) {
+            SecureField(L10n.tr("密码"), text: $decryptionPassword)
+            Button(L10n.tr("打开")) { decryptPendingSource() }
+            Button(L10n.tr("取消"), role: .cancel) { cancelDecryption() }
+        } message: { Text(L10n.tr(decryptionMessage ?? "这个照片包已加密，请输入发送者告诉你的密码。")) }
+        .overlay {
+            if let stage = crypto.stage {
+                CryptoProgressCard(stage: stage, fraction: crypto.fraction, onCancel: crypto.cancel)
+            }
         }
         .sheet(item: nonShareSheet, onDismiss: {
             // A late SwiftUI dismissal must not release the native share request.
@@ -737,6 +771,73 @@ struct ContentView: View {
         }
     }
 
+    private func beginEncryptedShare(_ id: UUID) {
+        guard !working, !preparingShare else { return }
+        sharePassword = ""; sharePasswordConfirmation = ""
+        encryptingPackageID = id
+    }
+
+    /// Same preparation as a normal share, then a temporary encrypted copy.
+    private func shareEncryptedArchive(packageID: UUID, password: String) {
+        guard !working, !preparingShare, activeSheet == nil, sheetDismissalFinished,
+              let albumID = package.library.first(where: { $0.id == packageID })?.job.stableAlbumID else { return }
+        preparingShare = true
+        shareResult = nil
+        uiMessage = nil
+        Task {
+            defer { preparingShare = false }
+            guard let url = await package.shareURL(packageID: packageID, format: .dropack, onCreated: { updated in
+                showPackageDetail(updated)
+            }) else { return }
+            do {
+                let encrypted = try await crypto.encryptForSharing(url, password: password)
+                guard scenePhase == .active, activeSheet == nil, sheetDismissalFinished else {
+                    crypto.finishSharing(); return
+                }
+                let sharedSnapshot = packageSnapshotID(for: albumID) ?? packageID
+                showPackageDetail(sharedSnapshot)
+                presentShare(url: encrypted, packageID: sharedSnapshot)
+            } catch is CancellationError {
+                crypto.finishSharing()
+            } catch {
+                crypto.finishSharing()
+                uiMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func decryptPendingSource() {
+        guard var request = pendingDecryption else { return }
+        let password = decryptionPassword
+        decryptionPassword = ""
+        request.isAsking = false
+        pendingDecryption = request
+        Task {
+            do {
+                let decrypted = try await crypto.decryptForImport(request.source.url, password: password)
+                pendingDecryption = nil
+                decryptionMessage = nil
+                openDecrypted(PendingSource(url: decrypted), original: request.source, replacing: request.replacing)
+            } catch EncryptedPackageError.wrongPassword {
+                decryptionMessage = EncryptedPackageError.wrongPassword.localizedDescription
+                pendingDecryption?.isAsking = true
+            } catch is CancellationError {
+                cancelDecryption()
+            } catch {
+                cancelDecryption()
+                uiMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelDecryption() {
+        guard let request = pendingDecryption else { return }
+        pendingDecryption = nil
+        decryptionPassword = ""
+        decryptionMessage = nil
+        if !inbox.sources.contains(where: { $0.id == request.source.id }) { request.source.releaseScope() }
+    }
+
     private func beginRename(_ id: UUID) {
         albumName = package.library.first(where: { $0.id == id })?.job.displayTitle ?? ""
         renamingPackageID = id
@@ -808,6 +909,7 @@ struct ContentView: View {
     private func sheetDismissed() {
         sheetDismissalFinished = true
         controller.finishSharing()
+        crypto.finishSharing()
         if let destination = pendingTaskNavigation {
             pendingTaskNavigation = nil
             navigate(destination)
@@ -959,6 +1061,11 @@ struct ContentView: View {
     private func openSource(replacing: Bool) {
         guard let source = pendingSource, !working else { return }
         pendingSource = nil
+        if !source.relink, EncryptedPackage.isEncrypted(source.url) {
+            decryptionPassword = ""; decryptionMessage = nil
+            pendingDecryption = PendingDecryption(source: source, replacing: replacing)
+            return
+        }
         openingSourceID = source.id
         uiMessage = nil
         navigate(.preparingSource, renew: true)
@@ -979,6 +1086,23 @@ struct ContentView: View {
                 // A manual picker selection is owned only by this operation.
                 source.releaseScope()
             }
+        }
+    }
+
+    /// Imports the local decrypted copy; the received encrypted file is then done.
+    private func openDecrypted(_ decrypted: PendingSource, original: PendingSource, replacing: Bool) {
+        guard !working else { crypto.discardDecrypted(decrypted.url); cancelDecryption(); return }
+        openingSourceID = original.id
+        uiMessage = nil
+        navigate(.preparingSource, renew: true)
+        Task {
+            defer { openingSourceID = nil }
+            let accepted = replacing ? await controller.replaceSource(decrypted.url) : await controller.selectSource(decrypted.url)
+            if accepted {
+                showImportDetail()
+                inbox.remove(original)
+            } else { crypto.discardDecrypted(decrypted.url) }
+            if accepted || !inbox.sources.contains(where: { $0.id == original.id }) { original.releaseScope() }
         }
     }
 
@@ -1105,6 +1229,36 @@ private struct ObservedWorkflowDestination<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View { content() }
+}
+
+private struct PendingDecryption {
+    let source: PendingSource
+    let replacing: Bool
+    var isAsking = true
+}
+
+private struct CryptoProgressCard: View {
+    let stage: String
+    let fraction: Double
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.25).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                Label(L10n.tr(stage), systemImage: "lock.fill").font(.headline)
+                ProgressView(value: fraction)
+                Text(fraction.formatted(.percent.precision(.fractionLength(0))))
+                    .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                Button(L10n.tr("取消"), role: .cancel, action: onCancel)
+            }
+            .padding(20)
+            .frame(maxWidth: 320)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(24)
+        }
+        .accessibilityIdentifier("cryptoProgress")
+    }
 }
 
 private enum DropackAlert { case replaceImport, clearImport, deletePackage(UUID), clearPackage }

@@ -95,6 +95,7 @@ struct PackageLibraryDetailView: View {
     /// The parent owns deletion confirmation and the resulting navigation.
     var onDelete: () -> Void
     var onRename: () -> Void
+    var onEncryptedShare: () -> Void
     var onReselect: () -> Void
     var onDetails: () -> Void
     var onUpdated: (UUID) -> Void
@@ -284,6 +285,10 @@ struct PackageLibraryDetailView: View {
                         })) { Label(L10n.tr("去除位置信息"), systemImage: "location.slash") }
                             .disabled(disabled || entry.issue != nil)
                             .accessibilityIdentifier("removeLocationToggle")
+                        Button(L10n.tr("加密分享…"), systemImage: "lock") { onEncryptedShare() }
+                            .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
+                                hasIssue: entry.issue != nil, isBusy: disabled))
+                            .accessibilityIdentifier("encryptedShareButton")
                         Button(L10n.tr("导出普通 ZIP"), systemImage: "doc.zipper") { onShare(.zip) }
                             .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
                                 hasIssue: entry.issue != nil, isBusy: disabled))
