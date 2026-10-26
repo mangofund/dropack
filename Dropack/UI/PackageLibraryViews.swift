@@ -272,6 +272,18 @@ struct PackageLibraryDetailView: View {
                             .accessibilityIdentifier("sentAlbumInfoButton")
                         Button(L10n.tr("重命名"), systemImage: "pencil", action: onRename)
                             .disabled(disabled)
+                        Toggle(isOn: Binding(get: { entry.job.removesLocation == true }, set: { enabled in
+                            mutating = true
+                            Task {
+                                defer { mutating = false }
+                                editMessage = nil
+                                if !(await package.setRemovesLocation(packageID: packageID, enabled: enabled, onCreated: onUpdated)) {
+                                    editMessage = package.message ?? "未能更新相册，请重试。"
+                                }
+                            }
+                        })) { Label(L10n.tr("去除位置信息"), systemImage: "location.slash") }
+                            .disabled(disabled || entry.issue != nil)
+                            .accessibilityIdentifier("removeLocationToggle")
                         Button(L10n.tr("导出普通 ZIP"), systemImage: "doc.zipper") { onShare(.zip) }
                             .disabled(!PackageAlbumEditingPresentation.canShare(assetCount: entry.totalCount,
                                 hasIssue: entry.issue != nil, isBusy: disabled))

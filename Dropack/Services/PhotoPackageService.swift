@@ -518,6 +518,17 @@ actor PhotoPackageService {
         return revised
     }
 
+    func setRemovesLocation(packageID: UUID, enabled: Bool) throws -> PackageJob {
+        guard runningID == nil, !mutationInProgress, let requested = try libraryStore.load(id: packageID),
+              let current = try libraryStore.latest(albumID: requested.stableAlbumID) else {
+            throw PackageModelError.invalidCheckpoint
+        }
+        guard (current.removesLocation ?? false) != enabled else { return current }
+        mutationInProgress = true
+        defer { mutationInProgress = false }
+        return try newSnapshot(from: current, assets: current.assets, removesLocation: enabled)
+    }
+
     private func photoAssets(identifiers: [String]) -> [PackageAsset] {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         guard status == .authorized || status == .limited else { return identifiers.map(PackageAsset.init) }
@@ -535,7 +546,8 @@ actor PhotoPackageService {
         }.sorted { ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
     }
 
-    private func newSnapshot(from previousJob: PackageJob, assets: [PackageAsset], title: String? = nil) throws -> PackageJob {
+    private func newSnapshot(from previousJob: PackageJob, assets: [PackageAsset], title: String? = nil,
+                             removesLocation: Bool? = nil) throws -> PackageJob {
         // Historical journals can be opened directly without first activating
         // them. Complete their interrupted append rollback before retaining any
         // immutable checkpoint records in a new revision.
@@ -551,6 +563,9 @@ actor PhotoPackageService {
         next.phase = .draft; next.packagingRequested = false
         next.linkedPhotosAlbumIdentifier = old.linkedPhotosAlbumIdentifier
         next.titleWasEdited = old.titleWasEdited
+        next.removesLocation = removesLocation ?? old.removesLocation
+        // Packaged bytes differ once location is removed; never reuse across that choice.
+        let canReuse = (next.removesLocation ?? false) == (old.removesLocation ?? false)
         let oldIDs = Set(old.selectedAssetIdentifiers)
         let newIDs = Set(assets.map(\.assetIdentifier))
         next.addedAssetCount = newIDs.subtracting(oldIDs).count
@@ -561,7 +576,7 @@ actor PhotoPackageService {
             item.reuseSourcePackageID = nil
             if let prior = previous[item.assetIdentifier] {
                 item.id = prior.id
-                if unchanged(prior, item) {
+                if canReuse, unchanged(prior, item) {
                     item.reuseSourcePackageID = prior.isCompleted ? old.id : prior.reuseSourcePackageID
                 }
             }
@@ -673,6 +688,9 @@ actor PhotoPackageService {
                     if let access = exported.securityScope { access.stopAccessingSecurityScopedResource() }
                 }
                 try Task.checkCancellation()
+                if job.removesLocation == true {
+                    exported = try await removeLocation(from: exported, job: job, progress: progress)
+                }
                 // A small preview travels with the package, so receiving a 30 GB
                 // video can show its thumbnail without reading/decompressing it.
                 await saveThumbnail(exported: exported, job: job)
@@ -749,6 +767,7 @@ actor PhotoPackageService {
     private func reusableAsset(_ selected: PackageAsset, for job: PackageJob, source cachedSource: PackageJob? = nil, asset cachedAsset: PackageAsset? = nil) throws -> (job: PackageJob, asset: PackageAsset)? {
         guard let id = selected.reuseSourcePackageID else { return nil }
         guard id != job.id, let source = try cachedSource ?? libraryStore.load(id: id), source.stableAlbumID == job.stableAlbumID,
+              (source.removesLocation ?? false) == (job.removesLocation ?? false),
               let asset = cachedAsset ?? source.assets.first(where: { $0.id == selected.id }), asset.isCompleted,
               unchanged(asset, selected) else { throw PhotoPackageError.archiveMismatch }
         // Detect an available source changing after draft creation. Never pass a
@@ -1099,6 +1118,42 @@ actor PhotoPackageService {
                                  originalProgress: originals.snapshot)
         } catch {
             if scoped { location.root.stopAccessingSecurityScopedResource() }
+            throw error
+        }
+    }
+
+    /// Replaces each media resource with a staged copy without location metadata.
+    /// The caller's defer removes whichever resources `exported` holds on exit.
+    private func removeLocation(from exported: ExportedAsset, job: PackageJob,
+                                progress: @escaping @Sendable (PackageUpdate) -> Void) async throws -> ExportedAsset {
+        let staging = stagingURL(job)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        var result = exported
+        var created: [URL] = []
+        do {
+            for index in result.resources.indices {
+                try Task.checkCancellation()
+                let resource = result.resources[index]
+                guard let kind = MediaPolicy.kind(for: resource.path) else { continue }
+                try checkSpace(required: resource.byteCount.addingClamped(safetyMargin), at: directory(job))
+                progress(PackageUpdate(job: nil, stage: "去除位置信息",
+                    fraction: Double(index) / Double(result.resources.count), name: resource.displayName,
+                    assetID: result.item.id, originalProgress: result.originalProgress))
+                if let source = resource.source { try PackageFileAccess.validate(resource.url, source: source) }
+                let ext = (resource.path as NSString).pathExtension
+                let destination = staging.appendingPathComponent("\(result.item.id)-\(index)-nolocation.\(ext)")
+                created.append(destination)
+                let removed = try await LocationMetadataRemoval.removeLocation(from: resource.url, kind: kind,
+                    to: destination, displayName: resource.displayName)
+                if resource.isTemporary { try? FileManager.default.removeItem(at: resource.url) }
+                result.resources[index] = ExportedResource(url: destination, path: resource.path,
+                    byteCount: removed.byteCount, hash: removed.hash, displayName: resource.displayName)
+                if resource.path == result.item.photoPath { result.item.photoSHA256 = removed.hash }
+                if resource.path == result.item.videoPath { result.item.videoSHA256 = removed.hash }
+            }
+            return result
+        } catch {
+            for url in created { try? FileManager.default.removeItem(at: url) }
             throw error
         }
     }

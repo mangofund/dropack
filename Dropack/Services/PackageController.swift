@@ -270,6 +270,15 @@ final class PackageController: ObservableObject {
         } != nil
     }
 
+    @discardableResult
+    func setRemovesLocation(packageID: UUID, enabled: Bool, onCreated: ((UUID) -> Void)? = nil) async -> Bool {
+        guard !isBusy else { return false }
+        return await createOperation(totalCount: job?.totalCount ?? 0, onCreated: onCreated,
+                                     captureOriginals: false) {
+            try await self.service.setRemovesLocation(packageID: packageID, enabled: enabled)
+        } != nil
+    }
+
     private func createOperation(totalCount: Int, onCreated: ((UUID) -> Void)?,
                                  packageAfterPreparation: Bool = false,
                                  captureOriginals: Bool = true,
